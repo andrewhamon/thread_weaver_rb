@@ -1,0 +1,13 @@
+{
+    "cSpell.words": [
+        "bindir"
+    ],
+    "ruby.format": "standard",
+    "ruby.lint": {
+        "standard": {
+            "useBundler": true,
+          }
+    },
+    "ruby.useLanguageServer": true,
+    "ruby.useBundler": true
+}
