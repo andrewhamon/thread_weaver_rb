@@ -6,4 +6,8 @@ require "standard/rake"
 
 RSpec::Core::RakeTask.new(:spec)
 
-task default: %i[spec standard]
+task :sorbet do
+  sh "bundle exec srb tc"
+end
+
+task default: %i[sorbet spec standard]
