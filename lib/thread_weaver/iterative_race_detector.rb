@@ -5,6 +5,8 @@ module ThreadWeaver
 
   class DeadlockDetectedError < Error; end
 
+  class BlockingSynchronizationDetected < Error; end
+
   DEADLOCK_MIGHT_BE_CONFIG = T.let(
     "Either there is a deadlock, or assume_deadlocked_after_ms is set too low. Try increasing "\
     "assume_deadlocked_after_ms to a higher value.",
@@ -21,13 +23,15 @@ module ThreadWeaver
         check: T.proc.params(arg0: T.untyped).returns(T::Boolean),
         target_classes: T::Array[Module],
         assume_deadlocked_after_ms: Integer,
-        run_secondary: T.nilable(T.proc.params(arg0: T.untyped).void)
+        run_secondary: T.nilable(T.proc.params(arg0: T.untyped).void),
+        expect_nonblocking: T::Boolean
       ).void
     end
-    def initialize(setup:, run:, check:, target_classes:, assume_deadlocked_after_ms:, run_secondary: nil)
+    def initialize(setup:, run:, check:, target_classes:, assume_deadlocked_after_ms:, run_secondary: nil, expect_nonblocking: false)
       @setup_blk = T.let(setup, T.proc.returns(T.untyped))
       @check_blk = T.let(check, T.proc.params(arg0: T.untyped).returns(T::Boolean))
       @target_classes = T.let(target_classes, T::Array[Module])
+      @expect_nonblocking = T.let(expect_nonblocking, T::Boolean)
 
       @run_blk = T.let(run, T.proc.params(arg0: T.untyped).void)
       # Secondary is optional as the common case will be testing two identical blocks of code
@@ -49,7 +53,7 @@ module ThreadWeaver
       hold_primary_at_line_count = -1
       done = T.let(false, T::Boolean)
 
-      exception_raised_on_join = T.let(nil, T.nilable(Exception))
+      error_encountered = T.let(nil, T.nilable(Exception))
 
       until done
         Timeout.timeout(2 * @assume_deadlocked_after) do
@@ -80,6 +84,13 @@ module ThreadWeaver
             # For that reason, this isn't considered an outright error.
             @secondary_deadlocked_count += 1
             primary_thread.set_and_wait_for_next_instruction(ContinueToThreadEnd.new)
+
+            if @expect_nonblocking
+              error_encountered ||= BlockingSynchronizationDetected.new(
+                "Deadlock detected, but expect_nonblocking was set to true. Make sure you aren't "\
+                "blocking waiting for a lock."
+              )
+            end
           end
 
           # Wait for the secondary thread to complete, taking note of any errors
@@ -88,7 +99,7 @@ module ThreadWeaver
           rescue => e
             # Defer exception until after the primary thread gets a chance to join, to avoid leaking
             # threads
-            exception_raised_on_join ||= e
+            error_encountered ||= e
           end
 
           # Only now that the secondary thread has completed, release the primary thread
@@ -111,7 +122,7 @@ module ThreadWeaver
           end
 
           # Now that both threads have had a chance to join, raise any errors discovered
-          raise exception_raised_on_join if exception_raised_on_join
+          raise error_encountered if error_encountered
 
           check_passed = @check_blk.call(context)
 

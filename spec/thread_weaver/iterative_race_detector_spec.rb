@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../../examples/thread_safe_run_at_most_once"
+require_relative "../../examples/thread_safe_nonblocking_run_at_most_once"
 require_relative "../../examples/thread_unsafe_run_at_most_once"
 require_relative "../../examples/always_deadlocks"
 require_relative "../../examples/takes_a_while"
@@ -80,6 +81,52 @@ RSpec.describe ThreadWeaver::IterativeRaceDetector do
         target_classes: [ThreadSafeRunAtMostOnce],
         assume_deadlocked_after_ms: assume_deadlocked_after_ms
       ).run
+    end
+
+    context "expect_nonblocking is true" do
+      it "detects that this is a blocking implementation and raises an error" do
+        expect {
+          ThreadWeaver::IterativeRaceDetector.new(
+            setup: -> {
+              context = {invocations: 0}
+              at_most_once = ThreadSafeRunAtMostOnce.new {
+                context[:invocations] += 1
+              }
+
+              context[:at_most_once] = at_most_once
+              context
+            },
+            run: ->(context) { context[:at_most_once].call },
+            check: ->(context) { expect(context[:invocations]).to eq(1) },
+            target_classes: [ThreadSafeRunAtMostOnce],
+            assume_deadlocked_after_ms: assume_deadlocked_after_ms,
+            expect_nonblocking: true
+          ).run
+        }.to raise_error(ThreadWeaver::BlockingSynchronizationDetected)
+      end
+    end
+  end
+
+  context "running ThreadSafeNonblockingRunAtMostOnce concurrently" do
+    context "expect_nonblocking is true" do
+      it "detects no errors" do
+        ThreadWeaver::IterativeRaceDetector.new(
+          setup: -> {
+            context = {invocations: 0}
+            at_most_once = ThreadSafeNonblockingRunAtMostOnce.new {
+              context[:invocations] += 1
+            }
+
+            context[:at_most_once] = at_most_once
+            context
+          },
+          run: ->(context) { context[:at_most_once].call },
+          check: ->(context) { expect(context[:invocations]).to eq(1) },
+          target_classes: [ThreadSafeNonblockingRunAtMostOnce],
+          assume_deadlocked_after_ms: assume_deadlocked_after_ms,
+          expect_nonblocking: true
+        ).run
+      end
     end
   end
 
