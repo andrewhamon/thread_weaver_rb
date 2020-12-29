@@ -33,52 +33,50 @@ module ThreadWeaver
       hold_main_at_line_count = -1
       done = T.let(false, T::Boolean)
 
-      ControllableThread.with_thread_control_enabled do
-        until done
-          Timeout.timeout(2 * @assume_deadlocked_after) do
-            hold_main_at_line_count += 1
+      until done
+        Timeout.timeout(2 * @assume_deadlocked_after) do
+          hold_main_at_line_count += 1
 
-            context = @setup_blk.call
+          context = @setup_blk.call
 
-            primary_thread = ControllableThread.new(context, name: "primary_thread", &@primary_thread_blk)
-            primary_thread.report_on_exception = false
+          primary_thread = ControllableThread.new(context, name: "primary_thread", &@primary_thread_blk)
+          primary_thread.report_on_exception = false
 
-            primary_thread.set_and_wait_for_next_instruction(
-              PauseWhenLineCount.new(
-                count: hold_main_at_line_count,
-                target_classes: @target_classes
-              )
+          primary_thread.set_and_wait_for_next_instruction(
+            PauseWhenLineCount.new(
+              count: hold_main_at_line_count,
+              target_classes: @target_classes
             )
+          )
 
-            secondary_thread = ControllableThread.new(context, name: "secondary_thread", &@secondary_thread_blk)
+          secondary_thread = ControllableThread.new(context, name: "secondary_thread", &@secondary_thread_blk)
 
-            secondary_thread.set_next_instruction(ContinueToThreadEnd.new)
+          secondary_thread.set_next_instruction(ContinueToThreadEnd.new)
 
-            assumed_to_be_deadlocked = wait_for_thread_to_complete(secondary_thread)
+          assumed_to_be_deadlocked = wait_for_thread_to_complete(secondary_thread)
 
-            if assumed_to_be_deadlocked
-              # If at this point the second thread has not completed, assume that it is waiting on a
-              # lock held by the primary thread. In that case, we can cancel this test run. If this
-              # happens for every test run, though, there might be a problem.
-
-              primary_thread.set_and_wait_for_next_instruction(ContinueToThreadEnd.new)
-            end
-
-            secondary_thread.join
+          if assumed_to_be_deadlocked
+            # If at this point the second thread has not completed, assume that it is waiting on a
+            # lock held by the primary thread. In that case, we can cancel this test run. If this
+            # happens for every test run, though, there might be a problem.
 
             primary_thread.set_and_wait_for_next_instruction(ContinueToThreadEnd.new)
+          end
 
-            begin
-              primary_thread.join
-            rescue ThreadCompletedEarlyError
-              done = true
-            end
+          secondary_thread.join
 
-            check_passed = @check_blk.call(context)
+          primary_thread.set_and_wait_for_next_instruction(ContinueToThreadEnd.new)
 
-            unless check_passed
-              raise RaceConditionDetectedError.new("Test failed")
-            end
+          begin
+            primary_thread.join
+          rescue ThreadCompletedEarlyError
+            done = true
+          end
+
+          check_passed = @check_blk.call(context)
+
+          unless check_passed
+            raise RaceConditionDetectedError.new("Test failed")
           end
         end
       end

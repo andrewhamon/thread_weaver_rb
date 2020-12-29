@@ -6,21 +6,6 @@ module ThreadWeaver
   class ControllableThread < Thread
     extend T::Sig
 
-    sig { params(blk: T.proc.void).void }
-    def self.with_thread_control_enabled(&blk)
-      tracer = TracePoint.new(:line, :call, :return, :b_call, :b_return, :thread_begin, :thread_end, :c_call, :c_return) { |tp|
-        current_thread = Thread.current
-        if current_thread.is_a?(ControllableThread)
-          current_thread.handle_trace_point(tp)
-        end
-      }
-      tracer.enable
-
-      yield
-    ensure
-      tracer&.disable
-    end
-
     sig { returns(String) }
     attr_reader :last_trace_point_summary
 
@@ -37,8 +22,18 @@ module ThreadWeaver
       self.name = name
 
       super do
+        tracer = TracePoint.new(:line, :call, :return, :b_call, :b_return, :thread_begin, :thread_end, :c_call, :c_return) { |tp|
+          current_thread = Thread.current
+          if current_thread == self
+            current_thread.handle_trace_point(tp)
+          end
+        }
+        handle_thread_start
+        tracer.enable
         blk.call(context)
         handle_thread_end
+      ensure
+        tracer&.disable
       end
 
       wait_until_next_instruction_complete
@@ -140,6 +135,14 @@ module ThreadWeaver
     end
 
     private
+
+    sig { void }
+    def handle_thread_start
+      assert_self_is_current_thread
+      if @current_instruction.is_a?(PauseAtThreadStart)
+        wait_until_released
+      end
+    end
 
     sig { void }
     def handle_thread_end
