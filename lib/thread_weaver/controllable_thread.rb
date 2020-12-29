@@ -20,6 +20,7 @@ module ThreadWeaver
       @current_instruction = T.let(PauseAtThreadStart.new, ThreadInstruction)
 
       self.name = name
+      self.report_on_exception = false
 
       super do
         tracer = TracePoint.new(:line, :call, :return, :b_call, :b_return, :thread_begin, :thread_end, :c_call, :c_return) { |tp|

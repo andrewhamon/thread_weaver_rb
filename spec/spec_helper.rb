@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "thread_weaver"
+require "byebug"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

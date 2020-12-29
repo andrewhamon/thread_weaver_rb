@@ -13,3 +13,5 @@ gem "standard"
 
 gem "sorbet", group: :development
 gem "sorbet-runtime"
+
+gem "byebug"
