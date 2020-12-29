@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
-        "bindir"
+        "bindir",
+        "nilable"
     ],
     "ruby.format": "standard",
     "ruby.lint": {
