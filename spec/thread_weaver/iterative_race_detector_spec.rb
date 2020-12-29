@@ -1,36 +1,8 @@
 # typed: false
 # frozen_string_literal: true
 
-class ThreadSafeRunAtMostOnce
-  def initialize(&blk)
-    @blk = blk
-    @ran = false
-    @mutex = Mutex.new
-  end
-
-  def call
-    @mutex.synchronize do
-      unless @ran
-        @ran = true
-        @blk.call
-      end
-    end
-  end
-end
-
-class ThreadUnsafeRunAtMostOnce
-  def initialize(&blk)
-    @blk = blk
-    @ran = false
-  end
-
-  def call
-    unless @ran
-      @ran = true
-      @blk.call
-    end
-  end
-end
+require_relative "../../examples/thread_safe_run_at_most_once"
+require_relative "../../examples/thread_unsafe_run_at_most_once"
 
 RSpec.describe ThreadWeaver::IterativeRaceDetector do
   context "running ThreadSafeRunAtMostOnce concurrently" do
