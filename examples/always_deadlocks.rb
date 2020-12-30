@@ -1,3 +1,5 @@
+# This is a bit of a contrived example, but this class always deadlocks if the secondary is run
+# without eventually running the primary.
 class AlwaysDeadlocks
   def initialize
     @primary_has_run = false
