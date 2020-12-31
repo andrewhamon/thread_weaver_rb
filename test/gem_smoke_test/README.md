@@ -1,0 +1,3 @@
+# Don't publish broken gems, run `bin/gem_smoke_test` first
+
+The purpose of this test is to root out any issues that might not be caught during normal rspec testing, like gemspec metadata errors, runtime files not being added to the gem, or forgetting to declare a runtime dependency in the gemspec. These classes of errors can easily go unnoticed in dev and even CI, but we don't want them to make their way into a published gem. The way this smoke test works is by adding the gem (via local path) to examples/gem_smoke_test/Gemfile, bundling, and running test.rb. It relies on `bundle exec` to prevent any gems not declared as runtime dependencies from being found on the require path (which bundler is pretty good at).

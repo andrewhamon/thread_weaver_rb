@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+set -vx
+
+# See test/gem_smoke_test/README.md for more information as to the purpose of this file.
+
+cd test/gem_smoke_test
+bundle
+bundle exec ruby ./test.rb
